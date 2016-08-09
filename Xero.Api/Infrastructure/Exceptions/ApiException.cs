@@ -10,5 +10,7 @@ namespace Xero.Api.Infrastructure.Exceptions
         public int ErrorNumber { get; set; }
 
         public List<DataContractBase> Elements { get; set; }
+
+        public string Json { get; set; }
     }
 }

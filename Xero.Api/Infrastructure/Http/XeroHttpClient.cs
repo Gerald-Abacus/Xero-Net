@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
 using System.Net;
+using System.Xml;
 using Xero.Api.Common;
 using Xero.Api.Infrastructure.Exceptions;
 using Xero.Api.Infrastructure.Interfaces;
@@ -118,6 +119,7 @@ namespace Xero.Api.Infrastructure.Http
             if (response.StatusCode == HttpStatusCode.BadRequest)
             {
                 var data = JsonMapper.From<ApiException>(response.Body);
+                data.Json = response.Body;
 
                 if (data.Elements != null && data.Elements.Any())
                 {
@@ -134,7 +136,27 @@ namespace Xero.Api.Infrastructure.Http
 
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
-                throw new NotFoundException(response.Body);
+                var errorMessage = "";
+                //We can get a message like this:
+                //<Response xmlns:i="http://www.w3.org/2001/XMLSchema-instance"><ErrorNumber>0</ErrorNumber><Type>Error</Type><Message>Payroll has not been provisioned</Message></Response>
+                //We cannot parse it using the json parser.
+                if (response.Body.StartsWith("<Response"))
+                {
+                    var xmlDoc = new XmlDocument();
+                    xmlDoc.LoadXml(response.Body);
+
+                    var errorNumber = xmlDoc.FirstChild.ChildNodes[0];
+                    var type = xmlDoc.FirstChild.ChildNodes[1];
+                    var message = xmlDoc.FirstChild.ChildNodes[2];
+                    errorMessage = message.InnerText;
+                }
+                else
+                {
+                    var data = JsonMapper.From<ApiException>(response.Body);
+                    errorMessage = data.Message;
+                }
+
+                throw new NotFoundException(errorMessage);
             }
 
             if (response.StatusCode == HttpStatusCode.InternalServerError)
